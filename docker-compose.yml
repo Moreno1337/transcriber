@@ -1,0 +1,31 @@
+services:
+  transcriber:
+    build: .
+    container_name: local-transcriber
+    gpus: all
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?Configure HF_TOKEN no arquivo .env}
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./models:/app/models
+      - ./transcribe.py:/app/transcribe.py:ro
+      - ./merge.py:/app/merge.py:ro
+    stdin_open: true
+    tty: true
+
+  diarizer:
+    build:
+      context: .
+      dockerfile: Dockerfile.diarizer
+    container_name: local-diarizer
+    gpus: all
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?Configure HF_TOKEN no arquivo .env}
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./models:/app/models
+      - ./diarize.py:/app/diarize.py:ro
+    stdin_open: true
+    tty: true

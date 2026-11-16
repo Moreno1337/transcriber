@@ -1,0 +1,37 @@
+# Segredos
+.env
+.env.*
+!.env.example
+
+# Mídia de entrada e transcrições geradas
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+
+# Cache dos modelos (Whisper, pyannote / Hugging Face)
+models/
+
+# Logs de build e runtime
+build.log
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.python-version
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Editores
+.idea/
+.vscode/
+*.swp
+*~
