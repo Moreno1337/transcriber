@@ -9,15 +9,9 @@ O processamento é realizado na GPU do computador, sem cobrança por minuto tran
 - Windows com Docker Desktop instalado e em execução.
 - GPU NVIDIA compatível com CUDA e drivers atualizados.
 - Suporte de GPU habilitado no Docker/WSL 2.
-- Arquivo `.env` configurado na raiz do projeto com o token do Hugging Face (`HF_TOKEN`).
-- Acesso autorizado ao modelo `pyannote/speaker-diarization-community-1` no Hugging Face.
-- Imagens Docker já construídas (ou realizar a construção indicada abaixo).
-
-> **Atenção:** não compartilhe nem versione o arquivo `.env`, pois ele contém uma credencial.
+- Conta no Hugging Face com acesso autorizado ao modelo `pyannote/speaker-diarization-community-1`.
 
 ## Estrutura do projeto
-
-Exemplo da estrutura utilizada:
 
 ```text
 C:\transcriber\
@@ -25,6 +19,7 @@ C:\transcriber\
 ├── docker-compose.yml
 ├── Dockerfile
 ├── Dockerfile.diarizer
+├── transcribe.cmd
 ├── transcribe.py
 ├── diarize.py
 ├── merge.py
@@ -33,49 +28,53 @@ C:\transcriber\
 └── models\
 ```
 
-- `input/`: coloque aqui os vídeos ou áudios a processar.
-- `output/`: recebe os resultados, organizados pelo nome do arquivo, sem extensão.
-- `models/`: cache local dos modelos baixados.
+- `input/`: vídeos ou áudios a processar. A pasta vem vazia no clone.
+- `output/`: resultados, organizados pelo nome do arquivo, sem extensão. Também vem vazia.
+- `.env` e `models/`: criados na máquina local. Não vêm no repositório.
 
-## Uso rápido — três comandos
+## Primeira vez, depois do clone
 
-### 1. Preparar o arquivo
+Faça isto uma vez em cada máquina.
 
-Copie a gravação para `C:\transcriber\input\`. Por exemplo:
-
-```text
-C:\transcriber\input\reuniao.mkv
-```
-
-Abra o **PowerShell** e acesse a pasta do projeto:
+1. Clone o repositório e entre na pasta:
 
 ```powershell
-cd C:\transcriber
+git clone https://github.com/Moreno1337/transcriber.git
+cd transcriber
 ```
 
-### 2. Transcrever o conteúdo
+2. Crie o arquivo `.env` na raiz com o token do Hugging Face:
+
+```dotenv
+HF_TOKEN=seu_token_do_hugging_face
+```
+
+Não compartilhe nem versione esse arquivo. Ele contém uma credencial.
+
+3. Construa as imagens Docker:
 
 ```powershell
-docker compose run --rm transcriber python transcribe.py reuniao.mkv
+docker compose build
 ```
 
-Gera os arquivos `transcript.txt` e `transcript.jsonl` com as falas e seus horários.
+Se os Dockerfiles mudarem depois, rode esse comando de novo.
 
-### 3. Identificar os falantes
+## Transcrever um arquivo
+
+1. Copie a gravação para `input\`. Por exemplo, `input\reuniao.mp4`.
+2. Na pasta do projeto, no PowerShell:
 
 ```powershell
-docker compose run --rm diarizer python diarize.py reuniao.mkv
+.\transcribe reuniao.mp4
 ```
 
-Gera `speakers.json` com os intervalos de fala de cada participante, identificados como `SPEAKER_00`, `SPEAKER_01` etc.
+O comando executa as três etapas em sequência e para se alguma falhar:
 
-### 4. Combinar transcrição e falantes
+1. Transcrição, gerando `transcript.txt` e `transcript.jsonl`.
+2. Identificação dos falantes, gerando `speakers.json` com `SPEAKER_00`, `SPEAKER_01` etc.
+3. Combinação, gerando `transcript_diarized.txt` e `transcript_diarized.jsonl`.
 
-```powershell
-docker compose run --rm transcriber python merge.py reuniao.mkv
-```
-
-Gera `transcript_diarized.txt` e `transcript_diarized.jsonl`, contendo texto, horários e identificação dos falantes.
+Na primeira transcrição os modelos são baixados para `models\`. Isso exige internet e pode demorar. Nas execuções seguintes eles são reutilizados.
 
 **Pronto!** O arquivo principal para leitura ou envio ao ChatGPT é:
 
@@ -87,7 +86,7 @@ Para processamento estruturado, utilize `transcript_diarized.jsonl`.
 
 ## Onde ficam os resultados?
 
-Para uma gravação chamada `reuniao.mkv`:
+Para uma gravação chamada `reuniao.mp4`:
 
 ```text
 output\
@@ -109,43 +108,33 @@ output\
 
 ## Como processar outro arquivo
 
-Basta colocar o novo arquivo na pasta `input/` e substituir `reuniao.mkv` pelo nome real nos três comandos.
+Coloque o novo arquivo na pasta `input/` e passe o nome dele para o comando.
 
-Por exemplo, para `audiencia.mp4`:
+Por exemplo, para `audiencia.mkv`:
 
 ```powershell
-docker compose run --rm transcriber python transcribe.py audiencia.mp4
-docker compose run --rm diarizer python diarize.py audiencia.mp4
-docker compose run --rm transcriber python merge.py audiencia.mp4
+.\transcribe audiencia.mkv
 ```
 
 Resultado: `C:\transcriber\output\audiencia\`.
 
-**Importante:** use exatamente o mesmo nome do arquivo nos três comandos. Se o nome tiver espaços, coloque-o entre aspas, por exemplo `"Reunião Cliente.mkv"`.
+`.mp4` e `.mkv` usam o mesmo comando. Se o nome tiver espaços, coloque-o entre aspas, por exemplo `.\transcribe "Reunião Cliente.mp4"`.
+
+## Rodar uma etapa separada
+
+O comando único chama estes três passos. Eles podem ser executados individualmente, com o mesmo nome de arquivo, quando for preciso repetir só uma etapa:
+
+```powershell
+docker compose run --rm transcriber python transcribe.py reuniao.mkv
+docker compose run --rm diarizer python diarize.py reuniao.mkv
+docker compose run --rm transcriber python merge.py reuniao.mkv
+```
 
 ## Formatos suportados
 
 - `.mp4` e `.mkv` foram considerados no fluxo atual.
 - Outros formatos de áudio/vídeo podem funcionar desde que os codecs sejam reconhecidos por FFmpeg/PyAV.
 - Um arquivo MKV é um contêiner: a compatibilidade depende também do codec de áudio interno.
-
-## Primeira execução ou reconstrução
-
-Se estiver configurando o projeto em uma nova máquina ou alterar os Dockerfiles, construa as imagens:
-
-```powershell
-docker compose build
-```
-
-Na primeira execução, os modelos podem precisar ser baixados. Isso demanda conexão com a internet e pode levar algum tempo. Depois de armazenados em `models/`, podem ser reutilizados localmente.
-
-O arquivo `.env` deve conter uma entrada como:
-
-```dotenv
-HF_TOKEN=seu_token_do_hugging_face
-```
-
-Não coloque um token real em documentação ou repositórios públicos.
 
 ## Dicas e resolução de problemas
 
@@ -179,10 +168,9 @@ A execução local com Faster-Whisper e pyannote Community-1 não gera cobrança
 
 ```powershell
 cd C:\transcriber
-
-docker compose run --rm transcriber python transcribe.py reuniao.mkv
-docker compose run --rm diarizer python diarize.py reuniao.mkv
-docker compose run --rm transcriber python merge.py reuniao.mkv
+.\transcribe reuniao.mp4
 ```
+
+Na primeira máquina, antes disso: criar o `.env`, autorizar o modelo no Hugging Face e rodar `docker compose build`.
 
 **Arquivo final:** `output\reuniao\transcript_diarized.txt`
